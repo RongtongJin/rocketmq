@@ -26,11 +26,6 @@ import java.util.function.Function;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.rocketmq.common.attribute.CQType;
 import org.apache.rocketmq.common.constant.LoggerName;
-import org.apache.rocketmq.common.message.MessageAccessor;
-import org.apache.rocketmq.common.message.MessageConst;
-import org.apache.rocketmq.common.message.MessageDecoder;
-import org.apache.rocketmq.common.message.MessageExtBrokerInner;
-import org.apache.rocketmq.common.sysflag.MessageSysFlag;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.store.DispatchRequest;
@@ -95,7 +90,7 @@ public class BatchConsumeQueue implements ConsumeQueueInterface {
         this.storePath = storePath;
         this.mappedFileSize = mappedFileSize;
         this.messageStore = messageStore;
-        this.commitLogSize = messageStore.getCommitLog().getCommitLogSize();
+        this.commitLogSize = messageStore.getMessageStoreConfig().getMaxMessageSize();
 
         this.topic = topic;
         this.queueId = queueId;
@@ -353,7 +348,7 @@ public class BatchConsumeQueue implements ConsumeQueueInterface {
     @Override
     public void truncateDirtyLogicFiles(long phyOffset) {
 
-        long oldMinOffset =  minOffsetInQueue;
+        long oldMinOffset = minOffsetInQueue;
         long oldMaxOffset = maxOffsetInQueue;
 
         int logicFileSize = this.mappedFileSize;
@@ -422,8 +417,7 @@ public class BatchConsumeQueue implements ConsumeQueueInterface {
 
     @Override
     public boolean flush(final int flushLeastPages) {
-        boolean result = this.mappedFileQueue.flush(flushLeastPages);
-        return result;
+        return this.mappedFileQueue.flush(flushLeastPages);
     }
 
     @Override
@@ -514,20 +508,8 @@ public class BatchConsumeQueue implements ConsumeQueueInterface {
         this.messageStore.getRunningFlags().makeLogicsQueueError();
     }
 
-    @Override
-    public void assignQueueOffset(QueueOffsetAssigner queueOffsetAssigner, MessageExtBrokerInner msg, short messageNum) {
-        String topicQueueKey = getTopic() + "-" + getQueueId();
-
-        long queueOffset = queueOffsetAssigner.assignBatchQueueOffset(topicQueueKey, messageNum);
-
-        if (MessageSysFlag.check(msg.getSysFlag(), MessageSysFlag.INNER_BATCH_FLAG)) {
-            MessageAccessor.putProperty(msg, MessageConst.PROPERTY_INNER_BASE, String.valueOf(queueOffset));
-            msg.setPropertiesString(MessageDecoder.messageProperties2String(msg.getProperties()));
-        }
-        msg.setQueueOffset(queueOffset);
-    }
-
-    public boolean putBatchMessagePositionInfo(final long offset, final int size, final long tagsCode, final long storeTime,
+    public boolean putBatchMessagePositionInfo(final long offset, final int size, final long tagsCode,
+        final long storeTime,
         final long msgBaseOffset, final short batchSize) {
 
         if (offset <= this.maxMsgPhyOffsetInCommitLog) {
@@ -696,6 +678,7 @@ public class BatchConsumeQueue implements ConsumeQueueInterface {
 
     /**
      * Find the message whose timestamp is the smallest, greater than or equal to the given time.
+     *
      * @param timestamp
      * @return
      */
@@ -794,8 +777,8 @@ public class BatchConsumeQueue implements ConsumeQueueInterface {
                 }
             } else {
                 //The max timestamp of this file is smaller than the given timestamp, so double check the previous file
-                if (i + 1 <=  mappedFileNum - 1) {
-                    mappedFile =  mappedFileQueue.getMappedFiles().get(i + 1);
+                if (i + 1 <= mappedFileNum - 1) {
+                    mappedFile = mappedFileQueue.getMappedFiles().get(i + 1);
                     targetBcq = mappedFile;
                     break;
                 } else {
@@ -810,9 +793,10 @@ public class BatchConsumeQueue implements ConsumeQueueInterface {
 
     /**
      * Find the offset of which the value is equal or larger than the given targetValue.
-     * If there are many values equal to the target, then find the earliest one.
+     * If there are multiple values equal to the target, return the earliest one.
      */
-    public static int binarySearchRight(ByteBuffer byteBuffer, int left, int right, final int unitSize, final int unitShift,
+    public static int binarySearchRight(ByteBuffer byteBuffer, int left, int right, final int unitSize,
+        final int unitShift,
         long targetValue) {
         int mid = -1;
         while (left <= right) {
@@ -830,7 +814,7 @@ public class BatchConsumeQueue implements ConsumeQueueInterface {
                 if (tmpValue >= targetValue) {
                     return mid;
                 } else {
-                    left =  mid + unitSize;
+                    left = mid + unitSize;
                 }
             } else {
                 //mid is actually in the mid
@@ -989,6 +973,7 @@ public class BatchConsumeQueue implements ConsumeQueueInterface {
 
     /**
      * Batch msg offset (deep logic offset)
+     *
      * @return max deep offset
      */
     @Override
@@ -999,6 +984,17 @@ public class BatchConsumeQueue implements ConsumeQueueInterface {
     @Override
     public long getMinOffsetInQueue() {
         return minOffsetInQueue;
+    }
+
+    @Override
+    public long getQueueOffset(QueueOffsetOperator queueOffsetOperator) {
+        return queueOffsetOperator.getBatchQueueOffset(topic + "-" + queueId);
+    }
+
+    @Override
+    public void increaseQueueOffset(QueueOffsetOperator queueOffsetOperator,
+        short messageNum) {
+        queueOffsetOperator.increaseBatchQueueOffset(topic + "-" + queueId, messageNum);
     }
 
     @Override

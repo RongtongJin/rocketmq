@@ -2042,15 +2042,6 @@ public class DefaultMessageStore implements MessageStore {
         return BrokerRole.SYNC_MASTER == this.getMessageStoreConfig().getBrokerRole();
     }
 
-    @Override
-    public void assignOffset(MessageExtBrokerInner msg, short messageNum) {
-        final int tranType = MessageSysFlag.getTransactionValue(msg.getSysFlag());
-
-        if (tranType == MessageSysFlag.TRANSACTION_NOT_TYPE || tranType == MessageSysFlag.TRANSACTION_COMMIT_TYPE) {
-            this.consumeQueueStore.assignQueueOffset(msg, messageNum);
-        }
-    }
-
     public ConcurrentMap<String, TopicConfig> getTopicConfigs() {
         return this.topicConfigTable;
     }
@@ -2074,6 +2065,8 @@ public class DefaultMessageStore implements MessageStore {
                 brokerConfig.getBrokerId(), brokerConfig.isInBrokerContainer());
         }
     }
+
+
 
     class CommitLogDispatcherBuildConsumeQueue implements CommitLogDispatcher {
 

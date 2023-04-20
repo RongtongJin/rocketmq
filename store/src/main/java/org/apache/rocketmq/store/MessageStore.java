@@ -725,15 +725,6 @@ public interface MessageStore {
     boolean isSyncMaster();
 
     /**
-     * Assign an queue offset and increase it. If there is a race condition, you need to lock/unlock this method
-     * yourself.
-     *
-     * @param msg        message
-     * @param messageNum message num
-     */
-    void assignOffset(MessageExtBrokerInner msg, short messageNum);
-
-    /**
      * Get master broker message store in process in broker container
      *
      * @return

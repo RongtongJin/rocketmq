@@ -588,11 +588,6 @@ public abstract class AbstractPluginMessageStore implements MessageStore {
     }
 
     @Override
-    public void assignOffset(MessageExtBrokerInner msg, short messageNum) {
-        next.assignOffset(msg, messageNum);
-    }
-
-    @Override
     public List<PutMessageHook> getPutMessageHookList() {
         return next.getPutMessageHookList();
     }

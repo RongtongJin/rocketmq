@@ -18,7 +18,6 @@
 package org.apache.rocketmq.store.queue;
 
 import org.apache.rocketmq.common.attribute.CQType;
-import org.apache.rocketmq.common.message.MessageExtBrokerInner;
 import org.apache.rocketmq.store.DispatchRequest;
 import org.apache.rocketmq.store.MessageFilter;
 
@@ -140,12 +139,20 @@ public interface ConsumeQueueInterface extends FileQueueLifeCycle {
     void putMessagePositionInfoWrapper(DispatchRequest request);
 
     /**
-     * Assign queue offset.
-     * @param queueOffsetAssigner the delegated queue offset assigner
-     * @param msg message itself
+     * Get queue offset.
+     * @param queueOffsetOperator the delegated queue offset operator
+     *
+     * @return queue offset
+     */
+    long getQueueOffset(QueueOffsetOperator queueOffsetOperator);
+
+
+    /**
+     * Increase queue offset.
+     * @param queueOffsetOperator the delegated queue offset operator
      * @param messageNum message number
      */
-    void assignQueueOffset(QueueOffsetAssigner queueOffsetAssigner, MessageExtBrokerInner msg, short messageNum);
+    void increaseQueueOffset(QueueOffsetOperator queueOffsetOperator, short messageNum);
 
     /**
      * Estimate number of records matching given filter.

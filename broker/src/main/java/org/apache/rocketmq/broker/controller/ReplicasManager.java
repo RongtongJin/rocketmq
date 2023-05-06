@@ -201,7 +201,7 @@ public class ReplicasManager {
             if (this.masterBrokerId != null || brokerElect()) {
                 LOGGER.info("Master in this broker set is elected, masterBrokerId: {}, masterBrokerAddr: {}", this.masterBrokerId, this.masterAddress);
                 this.state = State.RUNNING;
-                setFenced(true);
+                setFenced(false);
                 LOGGER.info("All register process has been done, change state to: {}", this.state);
             } else {
                 return false;

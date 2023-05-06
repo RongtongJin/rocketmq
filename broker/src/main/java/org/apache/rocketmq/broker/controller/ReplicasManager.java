@@ -201,7 +201,7 @@ public class ReplicasManager {
             if (this.masterBrokerId != null || brokerElect()) {
                 LOGGER.info("Master in this broker set is elected, masterBrokerId: {}, masterBrokerAddr: {}", this.masterBrokerId, this.masterAddress);
                 this.state = State.RUNNING;
-                setFenced(false);
+                setFenced(true);
                 LOGGER.info("All register process has been done, change state to: {}", this.state);
             } else {
                 return false;
@@ -870,13 +870,7 @@ public class ReplicasManager {
     }
 
     public void setFenced(boolean fenced) {
-        if (fenced) {
-            this.brokerController.setIsolated(false);
-            this.brokerController.getMessageStore().getRunningFlags().makeFenced(false);
-        } else {
-            // prohibit writing and reading before confirming the broker role
-            this.brokerController.setIsolated(true);
-            this.brokerController.getMessageStore().getRunningFlags().makeFenced(true);
-        }
+        this.brokerController.setIsolated(fenced);
+        this.brokerController.getMessageStore().getRunningFlags().makeFenced(fenced);
     }
 }

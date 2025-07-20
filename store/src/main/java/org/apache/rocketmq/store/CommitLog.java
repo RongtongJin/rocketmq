@@ -342,8 +342,18 @@ public class CommitLog implements Swappable {
             MappedFile mappedFile = mappedFiles.get(index);
             ByteBuffer byteBuffer = mappedFile.sliceByteBuffer();
             long processOffset = mappedFile.getFileFromOffset();
-            long mappedFileOffset = 0;
+            long mappedFileOffset;
             long lastValidMsgPhyOffset = this.getConfirmOffset();
+
+            if (defaultMessageStore.getMessageStoreConfig().isEnableRocksDBStore()
+                && defaultMessageStore.getMessageStoreConfig().isEnableAcceleratedRecovery()) {
+                mappedFileOffset = dispatchFromPhyOffset - mappedFile.getFileFromOffset();
+                lastValidMsgPhyOffset = dispatchFromPhyOffset;
+                byteBuffer.position((int) mappedFileOffset);
+            } else {
+                mappedFileOffset = 0;
+            }
+
             while (true) {
                 DispatchRequest dispatchRequest = this.checkMessageAndReturnSize(byteBuffer, checkCRCOnRecover, checkDupInfo);
                 int size = dispatchRequest.getMsgSize();
@@ -728,9 +738,21 @@ public class CommitLog implements Swappable {
 
             ByteBuffer byteBuffer = mappedFile.sliceByteBuffer();
             long processOffset = mappedFile.getFileFromOffset();
-            long mappedFileOffset = 0;
-            long lastValidMsgPhyOffset = processOffset;
-            long lastConfirmValidMsgPhyOffset = processOffset;
+            long mappedFileOffset;
+            long lastValidMsgPhyOffset;
+            long lastConfirmValidMsgPhyOffset;
+
+            if (defaultMessageStore.getMessageStoreConfig().isEnableRocksDBStore()
+                && defaultMessageStore.getMessageStoreConfig().isEnableAcceleratedRecovery()) {
+                mappedFileOffset = maxPhyOffsetOfConsumeQueue - mappedFile.getFileFromOffset();
+                lastValidMsgPhyOffset = maxPhyOffsetOfConsumeQueue;
+                lastConfirmValidMsgPhyOffset = maxPhyOffsetOfConsumeQueue;
+                byteBuffer.position((int) mappedFileOffset);
+            } else {
+                mappedFileOffset = 0;
+                lastValidMsgPhyOffset = processOffset;
+                lastConfirmValidMsgPhyOffset = processOffset;
+            }
             // abnormal recover require dispatching
             boolean doDispatch = true;
             while (true) {

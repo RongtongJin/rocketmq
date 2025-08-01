@@ -641,12 +641,11 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
     }
 
     @Override
-    public boolean open() {
-        return true;
+    public void start() {
     }
 
     @Override
-    public void close() {
+    public void shutdown() {
         if (this.transactionalOpBatchService != null) {
             this.transactionalOpBatchService.shutdown();
         }

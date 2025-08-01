@@ -65,6 +65,7 @@ import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageExtBrokerInner;
 import org.apache.rocketmq.common.topic.TopicValidator;
 import org.apache.rocketmq.common.utils.ConcurrentHashMapUtils;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.remoting.CommandCallback;
@@ -99,7 +100,7 @@ import static org.apache.rocketmq.remoting.metrics.RemotingMetricsConstant.LABEL
 import static org.apache.rocketmq.remoting.metrics.RemotingMetricsConstant.LABEL_RESPONSE_CODE;
 import static org.apache.rocketmq.remoting.metrics.RemotingMetricsConstant.LABEL_RESULT;
 
-public class PopMessageProcessor implements NettyRequestProcessor {
+public class PopMessageProcessor implements NettyRequestProcessor, StartAndShutdown {
 
     private static final Logger POP_LOGGER = LoggerFactory.getLogger(LoggerName.ROCKETMQ_POP_LOGGER_NAME);
     private static final String BORN_TIME = "bornTime";
@@ -121,6 +122,18 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         this.queueLockManager = new QueueLockManager();
         this.popBufferMergeService = new PopBufferMergeService(this.brokerController, this);
         this.ckMessageNumber = new AtomicLong();
+    }
+
+    @Override
+    public void shutdown() throws Exception {
+        popLongPollingService.shutdown();
+        queueLockManager.shutdown();
+        popBufferMergeService.shutdown();
+    }
+
+    @Override
+    public void start() throws Exception {
+
     }
 
     protected String getReviveTopic() {

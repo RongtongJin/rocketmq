@@ -22,12 +22,13 @@ import java.util.concurrent.TimeUnit;
 import org.apache.rocketmq.broker.BrokerController;
 import org.apache.rocketmq.common.ThreadFactoryImpl;
 import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.common.utils.ThreadUtils;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.remoting.ChannelEventListener;
 
-public class ClientHousekeepingService implements ChannelEventListener {
+public class ClientHousekeepingService implements ChannelEventListener, StartAndShutdown {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private final BrokerController brokerController;
 
@@ -41,14 +42,11 @@ public class ClientHousekeepingService implements ChannelEventListener {
 
     public void start() {
 
-        this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    ClientHousekeepingService.this.scanExceptionChannel();
-                } catch (Throwable e) {
-                    log.error("Error occurred when scan not active client channels.", e);
-                }
+        this.scheduledExecutorService.scheduleAtFixedRate(() -> {
+            try {
+                ClientHousekeepingService.this.scanExceptionChannel();
+            } catch (Throwable e) {
+                log.error("Error occurred when scan not active client channels.", e);
             }
         }, 1000 * 10, 1000 * 10, TimeUnit.MILLISECONDS);
     }

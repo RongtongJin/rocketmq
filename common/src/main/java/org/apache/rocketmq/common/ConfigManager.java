@@ -17,13 +17,14 @@
 package org.apache.rocketmq.common;
 
 import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.common.utils.Shutdown;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Map;
 
-public abstract class ConfigManager {
+public abstract class ConfigManager implements Shutdown {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);
 
     public boolean load() {
@@ -87,6 +88,10 @@ public abstract class ConfigManager {
 
     public boolean stop() {
         return true;
+    }
+
+    public void shutdown() {
+        stop();
     }
 
     public abstract String configFilePath();

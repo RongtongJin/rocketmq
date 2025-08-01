@@ -31,6 +31,7 @@ import org.apache.rocketmq.common.TopicConfig;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.common.constant.PermName;
 import org.apache.rocketmq.common.help.FAQUrl;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.remoting.common.RemotingHelper;
@@ -43,7 +44,7 @@ import org.apache.rocketmq.remoting.protocol.header.NotificationResponseHeader;
 import org.apache.rocketmq.remoting.protocol.subscription.SubscriptionGroupConfig;
 import org.apache.rocketmq.store.exception.ConsumeQueueException;
 
-public class NotificationProcessor implements NettyRequestProcessor {
+public class NotificationProcessor implements NettyRequestProcessor, StartAndShutdown {
     private static final Logger POP_LOGGER = LoggerFactory.getLogger(LoggerName.ROCKETMQ_POP_LOGGER_NAME);
     private final BrokerController brokerController;
     private final Random random = new Random(System.currentTimeMillis());
@@ -53,6 +54,16 @@ public class NotificationProcessor implements NettyRequestProcessor {
     public NotificationProcessor(final BrokerController brokerController) {
         this.brokerController = brokerController;
         this.popLongPollingService = new PopLongPollingService(brokerController, this, true);
+    }
+
+    @Override
+    public void shutdown() throws Exception {
+        this.popLongPollingService.shutdown();
+    }
+
+    @Override
+    public void start() throws Exception {
+
     }
 
     @Override

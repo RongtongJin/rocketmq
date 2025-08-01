@@ -20,8 +20,9 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.apache.rocketmq.auth.authentication.model.User;
 import org.apache.rocketmq.auth.config.AuthConfig;
+import org.apache.rocketmq.common.utils.Shutdown;
 
-public interface AuthenticationMetadataManager {
+public interface AuthenticationMetadataManager extends Shutdown {
 
     void shutdown();
 

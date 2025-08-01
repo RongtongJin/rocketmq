@@ -100,6 +100,7 @@ import org.apache.rocketmq.broker.util.HookUtils;
 import org.apache.rocketmq.common.AbstractBrokerRunnable;
 import org.apache.rocketmq.common.BrokerConfig;
 import org.apache.rocketmq.common.BrokerIdentity;
+import org.apache.rocketmq.common.ConfigManager;
 import org.apache.rocketmq.common.MixAll;
 import org.apache.rocketmq.common.ThreadFactoryImpl;
 import org.apache.rocketmq.common.TopicConfig;
@@ -110,7 +111,9 @@ import org.apache.rocketmq.common.constant.PermName;
 import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageExtBrokerInner;
 import org.apache.rocketmq.common.stats.MomentStatsItem;
+import org.apache.rocketmq.common.utils.AbstractStartAndShutdown;
 import org.apache.rocketmq.common.utils.ServiceProvider;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.common.utils.ThreadUtils;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
@@ -301,6 +304,33 @@ public class BrokerController {
     private AuthenticationMetadataManager authenticationMetadataManager;
     private AuthorizationMetadataManager authorizationMetadataManager;
 
+    private final BrokerShutdown serviceAndManagerShutdownList = new BrokerShutdown();
+
+    private final List<ExecutorService> executorServiceShutdownList = new ArrayList<>();
+
+    private final List<ConfigManager> configManagerShutdownList = new ArrayList<>();
+
+    private static class BrokerShutdown extends AbstractStartAndShutdown {
+        @Override
+        public void appendStartAndShutdown(StartAndShutdown startAndShutdown) {
+            super.appendStartAndShutdown(startAndShutdown);
+        }
+
+        @Override public void shutdown() {
+            int index = startAndShutdownList.size() - 1;
+            for (; index >= 0; index--) {
+                try {
+                    if (startAndShutdownList.get(index) != null) {
+                        startAndShutdownList.get(index).shutdown();
+                    }
+                } catch (Throwable e) {
+                    LOG.error("shutdown {} error", startAndShutdownList.get(index).getClass().getName(), e);
+                }
+
+            }
+        }
+    }
+
     public BrokerController(
         final BrokerConfig brokerConfig,
         final NettyServerConfig nettyServerConfig,
@@ -359,6 +389,12 @@ public class BrokerController {
             this.consumerOffsetManager = messageStoreConfig.isEnableLmq() ? new LmqConsumerOffsetManager(this) : new ConsumerOffsetManager(this);
         }
         this.topicQueueMappingManager = new TopicQueueMappingManager(this);
+
+        configManagerShutdownList.add(topicConfigManager);
+        configManagerShutdownList.add(subscriptionGroupManager);
+        configManagerShutdownList.add(consumerOffsetManager);
+        configManagerShutdownList.add(topicQueueMappingManager);
+
         this.authenticationMetadataManager = AuthenticationFactory.getMetadataManager(this.authConfig);
         this.authorizationMetadataManager = AuthorizationFactory.getMetadataManager(this.authConfig);
         this.pullMessageProcessor = new PullMessageProcessor(this);
@@ -460,6 +496,42 @@ public class BrokerController {
         if (this.authConfig != null && this.authConfig.isMigrateAuthFromV1Enabled()) {
             new AuthMigrator(this.authConfig).migrate();
         }
+
+        appendBrokerServiceShutdownList();
+    }
+
+    protected void appendBrokerServiceShutdownList() {
+        for (BrokerAttachedPlugin brokerAttachedPlugin : brokerAttachedPlugins) {
+            serviceAndManagerShutdownList.appendShutdown(brokerAttachedPlugin);
+        }
+
+        serviceAndManagerShutdownList.appendShutdown(authorizationMetadataManager);
+        serviceAndManagerShutdownList.appendShutdown(authenticationMetadataManager);
+        serviceAndManagerShutdownList.appendShutdown(coldDataCgCtrService);
+        serviceAndManagerShutdownList.appendShutdown(coldDataPullRequestHoldService);
+        serviceAndManagerShutdownList.appendShutdown(brokerPreOnlineService);
+        serviceAndManagerShutdownList.appendShutdown(topicRouteInfoManager);
+        serviceAndManagerShutdownList.appendShutdown(escapeBridge);
+        serviceAndManagerShutdownList.appendShutdown(transactionMetricsFlushService);
+        serviceAndManagerShutdownList.appendShutdown(transactionalMessageCheckService);
+        serviceAndManagerShutdownList.appendShutdown(scheduleMessageService);
+        serviceAndManagerShutdownList.appendShutdown(brokerFastFailure);
+        serviceAndManagerShutdownList.appendShutdown(replicasManager);
+        serviceAndManagerShutdownList.appendShutdown(messageStore);
+        serviceAndManagerShutdownList.appendShutdown(broadcastOffsetManager);
+        serviceAndManagerShutdownList.appendShutdown(fileWatchService);
+        serviceAndManagerShutdownList.appendShutdown(timerMessageStore);
+        serviceAndManagerShutdownList.appendShutdown(topicQueueMappingCleanService);
+        serviceAndManagerShutdownList.appendShutdown(consumerIdsChangeListener);
+        serviceAndManagerShutdownList.appendShutdown(notificationProcessor);
+        serviceAndManagerShutdownList.appendShutdown(popMessageProcessor);
+        serviceAndManagerShutdownList.appendShutdown(ackMessageProcessor);
+        serviceAndManagerShutdownList.appendShutdown(popMessageProcessor);
+        serviceAndManagerShutdownList.appendShutdown(popConsumerService);
+        serviceAndManagerShutdownList.appendShutdown(pullRequestHoldService);
+        serviceAndManagerShutdownList.appendShutdown(clientHousekeepingService);
+        serviceAndManagerShutdownList.appendShutdown(brokerStatsManager);
+        serviceAndManagerShutdownList.appendShutdown(brokerMetricsManager);
     }
 
     public AuthConfig getAuthConfig() {
@@ -521,6 +593,8 @@ public class BrokerController {
             this.sendThreadPoolQueue,
             new ThreadFactoryImpl("SendMessageThread_", getBrokerIdentity()));
 
+        executorServiceShutdownList.add(sendMessageExecutor);
+
         this.pullMessageExecutor = ThreadUtils.newThreadPoolExecutor(
             this.brokerConfig.getPullMessageThreadPoolNums(),
             this.brokerConfig.getPullMessageThreadPoolNums(),
@@ -528,6 +602,8 @@ public class BrokerController {
             TimeUnit.MILLISECONDS,
             this.pullThreadPoolQueue,
             new ThreadFactoryImpl("PullMessageThread_", getBrokerIdentity()));
+
+        executorServiceShutdownList.add(pullMessageExecutor);
 
         this.litePullMessageExecutor = ThreadUtils.newThreadPoolExecutor(
             this.brokerConfig.getLitePullMessageThreadPoolNums(),
@@ -537,6 +613,8 @@ public class BrokerController {
             this.litePullThreadPoolQueue,
             new ThreadFactoryImpl("LitePullMessageThread_", getBrokerIdentity()));
 
+        executorServiceShutdownList.add(litePullMessageExecutor);
+
         this.putMessageFutureExecutor = ThreadUtils.newThreadPoolExecutor(
             this.brokerConfig.getPutMessageFutureThreadPoolNums(),
             this.brokerConfig.getPutMessageFutureThreadPoolNums(),
@@ -544,6 +622,8 @@ public class BrokerController {
             TimeUnit.MILLISECONDS,
             this.putThreadPoolQueue,
             new ThreadFactoryImpl("PutMessageThread_", getBrokerIdentity()));
+
+        executorServiceShutdownList.add(putMessageFutureExecutor);
 
         this.ackMessageExecutor = ThreadUtils.newThreadPoolExecutor(
             this.brokerConfig.getAckMessageThreadPoolNums(),
@@ -553,6 +633,8 @@ public class BrokerController {
             this.ackThreadPoolQueue,
             new ThreadFactoryImpl("AckMessageThread_", getBrokerIdentity()));
 
+        executorServiceShutdownList.add(ackMessageExecutor);
+
         this.queryMessageExecutor = ThreadUtils.newThreadPoolExecutor(
             this.brokerConfig.getQueryMessageThreadPoolNums(),
             this.brokerConfig.getQueryMessageThreadPoolNums(),
@@ -560,6 +642,8 @@ public class BrokerController {
             TimeUnit.MILLISECONDS,
             this.queryThreadPoolQueue,
             new ThreadFactoryImpl("QueryMessageThread_", getBrokerIdentity()));
+
+        executorServiceShutdownList.add(queryMessageExecutor);
 
         this.adminBrokerExecutor = ThreadUtils.newThreadPoolExecutor(
             this.brokerConfig.getAdminBrokerThreadPoolNums(),
@@ -569,6 +653,8 @@ public class BrokerController {
             this.adminBrokerThreadPoolQueue,
             new ThreadFactoryImpl("AdminBrokerThread_", getBrokerIdentity()));
 
+        executorServiceShutdownList.add(adminBrokerExecutor);
+
         this.clientManageExecutor = ThreadUtils.newThreadPoolExecutor(
             this.brokerConfig.getClientManageThreadPoolNums(),
             this.brokerConfig.getClientManageThreadPoolNums(),
@@ -576,6 +662,8 @@ public class BrokerController {
             TimeUnit.MILLISECONDS,
             this.clientManagerThreadPoolQueue,
             new ThreadFactoryImpl("ClientManageThread_", getBrokerIdentity()));
+
+        executorServiceShutdownList.add(clientManageExecutor);
 
         this.heartbeatExecutor = ThreadUtils.newThreadPoolExecutor(
             this.brokerConfig.getHeartbeatThreadPoolNums(),
@@ -585,6 +673,8 @@ public class BrokerController {
             this.heartbeatThreadPoolQueue,
             new ThreadFactoryImpl("HeartbeatThread_", true, getBrokerIdentity()));
 
+        executorServiceShutdownList.add(heartbeatExecutor);
+
         this.consumerManageExecutor = ThreadUtils.newThreadPoolExecutor(
             this.brokerConfig.getConsumerManageThreadPoolNums(),
             this.brokerConfig.getConsumerManageThreadPoolNums(),
@@ -592,6 +682,8 @@ public class BrokerController {
             TimeUnit.MILLISECONDS,
             this.consumerManagerThreadPoolQueue,
             new ThreadFactoryImpl("ConsumerManageThread_", true, getBrokerIdentity()));
+
+        executorServiceShutdownList.add(consumerManageExecutor);
 
         this.replyMessageExecutor = ThreadUtils.newThreadPoolExecutor(
             this.brokerConfig.getProcessReplyMessageThreadPoolNums(),
@@ -601,6 +693,8 @@ public class BrokerController {
             this.replyThreadPoolQueue,
             new ThreadFactoryImpl("ProcessReplyMessageThread_", getBrokerIdentity()));
 
+        executorServiceShutdownList.add(replyMessageExecutor);
+
         this.endTransactionExecutor = ThreadUtils.newThreadPoolExecutor(
             this.brokerConfig.getEndTransactionThreadPoolNums(),
             this.brokerConfig.getEndTransactionThreadPoolNums(),
@@ -609,6 +703,8 @@ public class BrokerController {
             this.endTransactionThreadPoolQueue,
             new ThreadFactoryImpl("EndTransactionThread_", getBrokerIdentity()));
 
+        executorServiceShutdownList.add(endTransactionExecutor);
+
         this.loadBalanceExecutor = ThreadUtils.newThreadPoolExecutor(
             this.brokerConfig.getLoadBalanceProcessorThreadPoolNums(),
             this.brokerConfig.getLoadBalanceProcessorThreadPoolNums(),
@@ -616,6 +712,8 @@ public class BrokerController {
             TimeUnit.MILLISECONDS,
             this.loadBalanceThreadPoolQueue,
             new ThreadFactoryImpl("LoadBalanceProcessorThread_", getBrokerIdentity()));
+
+        executorServiceShutdownList.add(loadBalanceExecutor);
 
         this.syncBrokerMemberGroupExecutorService = ThreadUtils.newScheduledThreadPool(1,
             new ThreadFactoryImpl("BrokerControllerSyncBrokerScheduledThread", getBrokerIdentity()));
@@ -692,7 +790,7 @@ public class BrokerController {
             public void run() {
                 try {
                     BrokerController.this.messageStore.getTimerMessageStore().getTimerMetrics()
-                            .cleanMetrics(BrokerController.this.topicConfigManager.getTopicConfigTable().keySet());
+                        .cleanMetrics(BrokerController.this.topicConfigManager.getTopicConfigTable().keySet());
                 } catch (Throwable e) {
                     LOG.error("BrokerController: failed to clean unused timer metrics.", e);
                 }
@@ -1336,7 +1434,6 @@ public class BrokerController {
         this.consumerOffsetManager = consumerOffsetManager;
     }
 
-
     public BroadcastOffsetManager getBroadcastOffsetManager() {
         return broadcastOffsetManager;
     }
@@ -1406,207 +1503,31 @@ public class BrokerController {
             }
         }
 
-        if (this.brokerMetricsManager != null) {
-            this.brokerMetricsManager.shutdown();
-        }
-
-        if (this.brokerStatsManager != null) {
-            this.brokerStatsManager.shutdown();
-        }
-
-        if (this.clientHousekeepingService != null) {
-            this.clientHousekeepingService.shutdown();
-        }
-
-        if (this.pullRequestHoldService != null) {
-            this.pullRequestHoldService.shutdown();
-        }
-
-        if (this.popConsumerService != null) {
-            this.popConsumerService.shutdown();
-        }
-
-        if (this.popMessageProcessor.getPopLongPollingService() != null) {
-            this.popMessageProcessor.getPopLongPollingService().shutdown();
-        }
-
-        if (this.popMessageProcessor.getQueueLockManager() != null) {
-            this.popMessageProcessor.getQueueLockManager().shutdown();
-        }
-
-        if (this.popMessageProcessor.getPopBufferMergeService() != null) {
-            this.popMessageProcessor.getPopBufferMergeService().shutdown();
-        }
-
-        if (this.ackMessageProcessor.getPopReviveServices() != null) {
-            this.ackMessageProcessor.shutdownPopReviveService();
-        }
-
-        if (this.transactionalMessageService != null) {
-            this.transactionalMessageService.close();
-        }
-
-        if (this.notificationProcessor != null) {
-            this.notificationProcessor.getPopLongPollingService().shutdown();
-        }
-
-        if (this.consumerIdsChangeListener != null) {
-            this.consumerIdsChangeListener.shutdown();
-        }
-
-        if (this.topicQueueMappingCleanService != null) {
-            this.topicQueueMappingCleanService.shutdown();
-        }
-        //it is better to make sure the timerMessageStore shutdown firstly
-        if (this.timerMessageStore != null) {
-            this.timerMessageStore.shutdown();
-        }
-        if (this.fileWatchService != null) {
-            this.fileWatchService.shutdown();
-        }
-
-        if (this.broadcastOffsetManager != null) {
-            this.broadcastOffsetManager.shutdown();
-        }
-
-        if (this.messageStore != null) {
-            this.messageStore.shutdown();
-        }
-
-        if (this.replicasManager != null) {
-            this.replicasManager.shutdown();
-        }
+        serviceAndManagerShutdownList.shutdown();
 
         shutdownScheduledExecutorService(this.scheduledExecutorService);
-
-        if (this.sendMessageExecutor != null) {
-            this.sendMessageExecutor.shutdown();
-        }
-
-        if (this.litePullMessageExecutor != null) {
-            this.litePullMessageExecutor.shutdown();
-        }
-
-        if (this.pullMessageExecutor != null) {
-            this.pullMessageExecutor.shutdown();
-        }
-
-        if (this.replyMessageExecutor != null) {
-            this.replyMessageExecutor.shutdown();
-        }
-
-        if (this.putMessageFutureExecutor != null) {
-            this.putMessageFutureExecutor.shutdown();
-        }
-
-        if (this.ackMessageExecutor != null) {
-            this.ackMessageExecutor.shutdown();
-        }
-
-        if (this.adminBrokerExecutor != null) {
-            this.adminBrokerExecutor.shutdown();
-        }
-
-        if (this.brokerFastFailure != null) {
-            this.brokerFastFailure.shutdown();
-        }
-
-        if (this.consumerFilterManager != null) {
-            this.consumerFilterManager.persist();
-        }
-
-        if (this.scheduleMessageService != null) {
-            this.scheduleMessageService.persist();
-            this.scheduleMessageService.shutdown();
-        }
-
-        if (this.clientManageExecutor != null) {
-            this.clientManageExecutor.shutdown();
-        }
-
-        if (this.queryMessageExecutor != null) {
-            this.queryMessageExecutor.shutdown();
-        }
-
-        if (this.heartbeatExecutor != null) {
-            this.heartbeatExecutor.shutdown();
-        }
-
-        if (this.consumerManageExecutor != null) {
-            this.consumerManageExecutor.shutdown();
-        }
-
-        if (this.transactionalMessageCheckService != null) {
-            this.transactionalMessageCheckService.shutdown(false);
-        }
-
-        if (this.endTransactionExecutor != null) {
-            this.endTransactionExecutor.shutdown();
-        }
-
-        if (this.transactionMetricsFlushService != null) {
-            this.transactionMetricsFlushService.shutdown();
-        }
-
-        if (this.escapeBridge != null) {
-            this.escapeBridge.shutdown();
-        }
-
-        if (this.topicRouteInfoManager != null) {
-            this.topicRouteInfoManager.shutdown();
-        }
-
-        if (this.brokerPreOnlineService != null && !this.brokerPreOnlineService.isStopped()) {
-            this.brokerPreOnlineService.shutdown();
-        }
-
-        if (this.coldDataPullRequestHoldService != null) {
-            this.coldDataPullRequestHoldService.shutdown();
-        }
-
-        if (this.coldDataCgCtrService != null) {
-            this.coldDataCgCtrService.shutdown();
-        }
-
         shutdownScheduledExecutorService(this.syncBrokerMemberGroupExecutorService);
         shutdownScheduledExecutorService(this.brokerHeartbeatExecutorService);
 
-        if (this.topicConfigManager != null) {
-            this.topicConfigManager.persist();
-            this.topicConfigManager.stop();
-        }
+        executorServiceShutdownList.forEach(executor -> {
+            try {
+                executor.shutdown();
+            } catch (Exception e) {
+                LOG.error("shutdown executorService error", e);
+            }
+        });
 
-        if (this.subscriptionGroupManager != null) {
-            this.subscriptionGroupManager.persist();
-            this.subscriptionGroupManager.stop();
-        }
-
-        if (this.consumerOffsetManager != null) {
-            this.consumerOffsetManager.persist();
-            this.consumerOffsetManager.stop();
-        }
-
-        if (this.consumerOrderInfoManager != null) {
-            this.consumerOrderInfoManager.persist();
-            this.consumerOrderInfoManager.shutdown();
-        }
+        configManagerShutdownList.forEach(configManager -> {
+            try {
+                configManager.persist();
+                configManager.shutdown();
+            } catch (Exception e) {
+                LOG.error("shutdown configManager error", e);
+            }
+        });
 
         if (this.configStorage != null) {
             this.configStorage.shutdown();
-        }
-
-        if (this.authenticationMetadataManager != null) {
-            this.authenticationMetadataManager.shutdown();
-        }
-
-        if (this.authorizationMetadataManager != null) {
-            this.authorizationMetadataManager.shutdown();
-        }
-
-        for (BrokerAttachedPlugin brokerAttachedPlugin : brokerAttachedPlugins) {
-            if (brokerAttachedPlugin != null) {
-                brokerAttachedPlugin.shutdown();
-            }
         }
     }
 
@@ -1881,8 +1802,8 @@ public class BrokerController {
                         new TopicConfig(topicConfig.getTopicName(),
                             topicConfig.getReadQueueNums(),
                             topicConfig.getWriteQueueNums(),
-                                topicConfig.getPerm()
-                                        & this.brokerConfig.getBrokerPermission(), topicConfig.getTopicSysFlag());
+                            topicConfig.getPerm()
+                                & this.brokerConfig.getBrokerPermission(), topicConfig.getTopicSysFlag());
                 } else {
                     registerTopicConfig = new TopicConfig(topicConfig);
                 }
@@ -2610,6 +2531,5 @@ public class BrokerController {
     public void setColdDataCgCtrService(ColdDataCgCtrService coldDataCgCtrService) {
         this.coldDataCgCtrService = coldDataCgCtrService;
     }
-
 
 }

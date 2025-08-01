@@ -16,7 +16,9 @@
  */
 package org.apache.rocketmq.broker.client;
 
-public interface ConsumerIdsChangeListener {
+import org.apache.rocketmq.common.utils.Shutdown;
+
+public interface ConsumerIdsChangeListener extends Shutdown {
 
     void handle(ConsumerGroupEvent event, String group, Object... args);
 

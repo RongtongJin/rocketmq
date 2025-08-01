@@ -34,6 +34,7 @@ import org.apache.rocketmq.common.help.FAQUrl;
 import org.apache.rocketmq.common.message.MessageConst;
 import org.apache.rocketmq.common.message.MessageDecoder;
 import org.apache.rocketmq.common.message.MessageExtBrokerInner;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.remoting.common.RemotingHelper;
@@ -52,7 +53,7 @@ import org.apache.rocketmq.store.exception.ConsumeQueueException;
 import org.apache.rocketmq.store.pop.AckMsg;
 import org.apache.rocketmq.store.pop.BatchAckMsg;
 
-public class AckMessageProcessor implements NettyRequestProcessor {
+public class AckMessageProcessor implements NettyRequestProcessor, StartAndShutdown {
 
     private static final Logger POP_LOGGER = LoggerFactory.getLogger(LoggerName.ROCKETMQ_POP_LOGGER_NAME);
     private final BrokerController brokerController;
@@ -70,6 +71,18 @@ public class AckMessageProcessor implements NettyRequestProcessor {
         }
     }
 
+    @Override
+    public void start() throws Exception {
+
+    }
+
+    @Override
+    public void shutdown() throws Exception {
+        for (PopReviveService popReviveService : popReviveServices) {
+            popReviveService.shutdown();
+        }
+    }
+
     public PopReviveService[] getPopReviveServices() {
         return popReviveServices;
     }
@@ -77,12 +90,6 @@ public class AckMessageProcessor implements NettyRequestProcessor {
     public void startPopReviveService() {
         for (PopReviveService popReviveService : popReviveServices) {
             popReviveService.start();
-        }
-    }
-
-    public void shutdownPopReviveService() {
-        for (PopReviveService popReviveService : popReviveServices) {
-            popReviveService.shutdown();
         }
     }
 

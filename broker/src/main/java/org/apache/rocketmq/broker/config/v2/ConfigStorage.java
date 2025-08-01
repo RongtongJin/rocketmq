@@ -35,6 +35,7 @@ import org.apache.rocketmq.common.ServiceThread;
 import org.apache.rocketmq.common.UtilAll;
 import org.apache.rocketmq.common.config.AbstractRocksDBStorage;
 import org.apache.rocketmq.common.config.ConfigHelper;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.store.config.MessageStoreConfig;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyOptions;

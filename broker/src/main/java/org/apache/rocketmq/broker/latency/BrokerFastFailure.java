@@ -29,6 +29,7 @@ import org.apache.rocketmq.common.ThreadFactoryImpl;
 import org.apache.rocketmq.common.UtilAll;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.common.future.FutureTaskExt;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.common.utils.ThreadUtils;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
@@ -36,10 +37,10 @@ import org.apache.rocketmq.remoting.netty.RequestTask;
 import org.apache.rocketmq.remoting.protocol.RemotingSysResponseCode;
 
 /**
- * BrokerFastFailure will cover {@link BrokerController#getSendThreadPoolQueue()} and {@link
- * BrokerController#getPullThreadPoolQueue()}
+ * BrokerFastFailure will cover {@link BrokerController#getSendThreadPoolQueue()} and
+ * {@link BrokerController#getPullThreadPoolQueue()}
  */
-public class BrokerFastFailure {
+public class BrokerFastFailure implements StartAndShutdown {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private final ScheduledExecutorService scheduledExecutorService;
     private final BrokerController brokerController;

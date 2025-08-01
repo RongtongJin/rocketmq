@@ -56,6 +56,7 @@ import org.apache.rocketmq.common.metrics.NopLongCounter;
 import org.apache.rocketmq.common.metrics.NopLongHistogram;
 import org.apache.rocketmq.common.metrics.NopObservableLongGauge;
 import org.apache.rocketmq.common.topic.TopicValidator;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
 import org.apache.rocketmq.remoting.metrics.RemotingMetricsManager;
@@ -114,7 +115,7 @@ import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.OPEN_TELE
 import static org.apache.rocketmq.remoting.metrics.RemotingMetricsConstant.LABEL_PROTOCOL_TYPE;
 import static org.apache.rocketmq.remoting.metrics.RemotingMetricsConstant.PROTOCOL_TYPE_REMOTING;
 
-public class BrokerMetricsManager {
+public class BrokerMetricsManager implements StartAndShutdown {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
 
     private final BrokerConfig brokerConfig;
@@ -174,6 +175,29 @@ public class BrokerMetricsManager {
         this.messageStore = brokerController.getMessageStore();
         this.consumerLagCalculator = new ConsumerLagCalculator(brokerController);
         init();
+    }
+
+    @Override
+    public void start() throws Exception {
+
+    }
+
+    @Override
+    public void shutdown() {
+        if (brokerConfig.getMetricsExporterType() == MetricsExporterType.OTLP_GRPC) {
+            periodicMetricReader.forceFlush();
+            periodicMetricReader.shutdown();
+            metricExporter.shutdown();
+        }
+        if (brokerConfig.getMetricsExporterType() == MetricsExporterType.PROM) {
+            prometheusHttpServer.forceFlush();
+            prometheusHttpServer.shutdown();
+        }
+        if (brokerConfig.getMetricsExporterType() == MetricsExporterType.LOG) {
+            periodicMetricReader.forceFlush();
+            periodicMetricReader.shutdown();
+            loggingMetricExporter.shutdown();
+        }
     }
 
     public static AttributesBuilder newAttributesBuilder() {
@@ -681,22 +705,4 @@ public class BrokerMetricsManager {
         messageStore.initMetrics(brokerMeter, BrokerMetricsManager::newAttributesBuilder);
         PopMetricsManager.initMetrics(brokerMeter, brokerController, BrokerMetricsManager::newAttributesBuilder);
     }
-
-    public void shutdown() {
-        if (brokerConfig.getMetricsExporterType() == MetricsExporterType.OTLP_GRPC) {
-            periodicMetricReader.forceFlush();
-            periodicMetricReader.shutdown();
-            metricExporter.shutdown();
-        }
-        if (brokerConfig.getMetricsExporterType() == MetricsExporterType.PROM) {
-            prometheusHttpServer.forceFlush();
-            prometheusHttpServer.shutdown();
-        }
-        if (brokerConfig.getMetricsExporterType() == MetricsExporterType.LOG) {
-            periodicMetricReader.forceFlush();
-            periodicMetricReader.shutdown();
-            loggingMetricExporter.shutdown();
-        }
-    }
-
 }

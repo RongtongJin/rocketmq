@@ -20,10 +20,11 @@ import java.util.concurrent.CompletableFuture;
 
 import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageExtBrokerInner;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.remoting.protocol.header.EndTransactionRequestHeader;
 import org.apache.rocketmq.store.PutMessageResult;
 
-public interface TransactionalMessageService {
+public interface TransactionalMessageService extends StartAndShutdown {
 
     /**
      * Process prepare message, in common, we should put this message to storage service.
@@ -76,18 +77,6 @@ public interface TransactionalMessageService {
      * be invoked.
      */
     void check(long transactionTimeout, int transactionCheckMax, AbstractTransactionalMessageCheckListener listener);
-
-    /**
-     * Open transaction service.
-     *
-     * @return If open success, return true.
-     */
-    boolean open();
-
-    /**
-     * Close transaction service.
-     */
-    void close();
 
     TransactionMetrics getTransactionMetrics();
 

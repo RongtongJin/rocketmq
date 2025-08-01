@@ -63,22 +63,20 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
     }
 
     @Override
-    public boolean open() {
-        return true;
-    }
-
-    @Override
-    public void close() {
-
-    }
-
-    @Override
     public TransactionMetrics getTransactionMetrics() {
         return null;
     }
 
     @Override
     public void setTransactionMetrics(TransactionMetrics transactionMetrics) {
+
+    }
+
+    @Override public void shutdown() throws Exception {
+
+    }
+
+    @Override public void start() throws Exception {
 
     }
 }

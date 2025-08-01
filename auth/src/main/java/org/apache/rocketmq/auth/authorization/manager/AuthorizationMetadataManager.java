@@ -22,8 +22,9 @@ import org.apache.rocketmq.auth.authentication.model.Subject;
 import org.apache.rocketmq.auth.authorization.enums.PolicyType;
 import org.apache.rocketmq.auth.authorization.model.Acl;
 import org.apache.rocketmq.auth.authorization.model.Resource;
+import org.apache.rocketmq.common.utils.Shutdown;
 
-public interface AuthorizationMetadataManager {
+public interface AuthorizationMetadataManager extends Shutdown {
 
     void shutdown();
 

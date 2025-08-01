@@ -18,8 +18,9 @@
 package org.apache.rocketmq.broker.plugin;
 
 import java.util.Map;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 
-public interface BrokerAttachedPlugin {
+public interface BrokerAttachedPlugin extends StartAndShutdown {
 
     /**
      * Get plugin name

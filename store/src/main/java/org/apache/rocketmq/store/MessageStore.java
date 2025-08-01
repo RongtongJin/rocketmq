@@ -34,6 +34,7 @@ import org.apache.rocketmq.common.SystemClock;
 import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageExtBatch;
 import org.apache.rocketmq.common.message.MessageExtBrokerInner;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.remoting.protocol.body.HARuntimeInfo;
 import org.apache.rocketmq.store.config.MessageStoreConfig;
 import org.apache.rocketmq.store.exception.ConsumeQueueException;
@@ -51,7 +52,7 @@ import org.rocksdb.RocksDBException;
 /**
  * This class defines contracting interfaces to implement, allowing third-party vendor to use customized message store.
  */
-public interface MessageStore {
+public interface MessageStore extends StartAndShutdown {
 
     /**
      * Load previously stored messages.
